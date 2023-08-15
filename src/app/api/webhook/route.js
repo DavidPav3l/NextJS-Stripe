@@ -1,36 +1,58 @@
-import Cors from "micro-cors";
+import Stripe from "stripe";
+import { NextResponse } from "next/server";
 
-const cors = Cors({
-  allowMethods: ["POST", "HEAD"],
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const webhookSecret = process.env.WEBHOOK_SECRET_KEY;
 
-const webhookHandler = async (req, res) => {
-  if (req.method === "POST") {
-    const buf = await buffer(req);
-
-    const sig = req.headers["stripe-signature"];
+const webhookHandler = async (req) => {
+  try {
+    const buf = await req.text();
+    const sig = req.headers.get("stripe-signature");
 
     let event;
 
     try {
-      event = stripe.webhooks.constructEvent(
-        buf.toString(),
-        sig,
-        webhookSecret,
-      );
+      event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
     } catch (err) {
-      // On error, log and return the error message
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      // On error, log and return the error message.
+      if (err instanceof Error) console.log(err);
+      console.log(`❌ Error message: ${errorMessage}`);
 
-      console.log(`❌ Error message: ${err.message}`);
-
-      res.status(400).send(`Webhook Error: ${err.message}`);
-
-      return;
+      return NextResponse.json(
+        {
+          error: {
+            message: `Webhook Error: ${errorMessage}`,
+          },
+        },
+        { status: 400 },
+      );
     }
 
-    // Successfully constructed event
+    console.log(event.type);
 
-    console.log("✅ Success:", event.id);
+    // Return a response to acknowledge receipt of the event.
+    return new Response(
+      { received: true },
+      {
+        status: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+      },
+    );
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: `Method Not Allowed`,
+        },
+      },
+      { status: 405 },
+    ).headers.set("Allow", "POST");
   }
 };
-export default cors(webhookHandler);
+
+export { webhookHandler as POST };

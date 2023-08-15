@@ -12,8 +12,8 @@ export async function POST(request) {
       },
     ],
     mode: "payment",
-    success_url: "https://localhost:3000",
-    cancel_url: "https://localhost:3000/cancel",
+    success_url: "http://localhost:3000",
+    cancel_url: "http://localhost:3000/cancel",
   });
   return NextResponse.json(session.url);
 }
