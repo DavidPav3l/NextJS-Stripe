@@ -1,6 +1,8 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 
+import { emailHandler } from "../handlers/emailHandler";
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const webhookSecret = process.env.WEBHOOK_SECRET_KEY;
 
@@ -29,8 +31,10 @@ const webhookHandler = async (req) => {
       );
     }
 
-    console.log(event.type);
-
+    if (event.type === "payment_intent.succeeded") {
+      const email = event.data.object.receipt_email;
+      await emailHandler(email);
+    }
     // Return a response to acknowledge receipt of the event.
     return new Response(
       { received: true },
